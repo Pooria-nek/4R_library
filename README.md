@@ -4,22 +4,35 @@ Arduino-framework library (works with STM32duino / "STM32 Cores" board package)
 for a 4-channel relay board that acts as a **subdevice** on a shared RS485 bus,
 using HDL Buspro-style addressing (Subnet ID / Device ID) and operation codes.
 
+## Depends on BusproCore
+
+This library now depends on a separate `BusproCore` library, which holds the
+shared frame codec, transport (RS485 DE/RE, address filtering), and dispatch
+layer used by **every** subdevice on the bus (4R, 4Z, and future boards).
+Install `BusproCore` alongside this library. See `BusproCore`'s README for
+why this split exists and the full op-code registry across devices.
+
 ## ⚠️ CRITICAL: Frame layer is NOT yet verified against real HDL Buspro hardware
 
-This library was built in two deliberately separated layers specifically so that
-the **one part that absolutely must match real hardware** (the wire frame format)
-can be swapped without touching anything else:
+This applies to `BusproCore`, not this library directly -- but it governs
+everything 4R sends/receives on the wire. See `BusproCore/README.md` and
+`BusproCore/src/BusproFrame.cpp` for the full placeholder-format breakdown
+and verification plan (`docs/CAPTURE_TEMPLATE.md`).
+
+This library's own layers:
 
 ```
-src/BusproFrame.h/.cpp     <-- ⚠️ PLACEHOLDER sync bytes + checksum. NOT VERIFIED.
-src/BusproTransport.h/.cpp <-- shared-bus byte handling, addressing filter, RS485 DE/RE
-src/BusproDevice.h/.cpp    <-- operation-code dispatch table
-src/Relay4R.h/.cpp         <-- relay control + scene logic (the actual "4R" device)
+src/Relay4R.h/.cpp    <-- relay control + scene logic (the actual "4R" device)
+src/SceneStore.h        <-- Area+Scene -> 4-relay-state mapping (RAM-backed for now)
 ```
 
-**Do not deploy this on a bus with real HDL Buspro devices until `BusproFrame.cpp`
-has been verified against a real capture.** Every place that needs verification is
-marked `// TODO_VERIFY_HDL` in the source. Specifically unverified:
+(BusproFrame / BusproTransport / BusproDevice now live in BusproCore --
+see that library if you need to touch wire-level encoding.)
+
+**Do not deploy this on a bus with real HDL Buspro devices until
+`BusproCore/src/BusproFrame.cpp` has been verified against a real capture.**
+Every place that needs verification is marked `// TODO_VERIFY_HDL` in that
+source file. Specifically unverified (full detail in `BusproCore/README.md`):
 
 1. Sync/leading byte pattern (placeholder: `0xAA 0xAA`)
 2. Length field meaning (placeholder: total bytes following the length byte, CRC included)
@@ -29,42 +42,37 @@ marked `// TODO_VERIFY_HDL` in the source. Specifically unverified:
 
 ### How to verify (recommended path)
 
-1. Wire a USB-RS485 sniffer (or a spare UART board in listen-only mode) onto the
-   same differential pair as a real HDL Buspro device.
-2. Trigger a known command from a genuine HDL panel/app — e.g. a scene recall.
-3. Capture the raw bytes on the wire.
-4. Compare against `docs/CAPTURE_TEMPLATE.md` in this repo (fill in actual bytes) —
-   from that, the real sync pattern, length convention, and CRC algorithm can be
-   derived empirically (e.g. brute-force matching CRC16 variants against the
-   captured trailing bytes is far more reliable than trusting any spec from memory).
-5. Once confirmed, update **only** `BusproFrame.cpp` — no other file should need
-   to change, since `BusproTransport` and above only depend on the decoded
-   `BusproFrame` struct, not on wire-level details.
+See `docs/CAPTURE_TEMPLATE.md` in this repo for the full capture procedure.
+Once confirmed, update **only** `BusproCore/src/BusproFrame.cpp` — no other
+file in BusproCore, 4R, or 4Z should need to change, since everything above
+that layer only depends on the decoded `BusproFrame` struct, not on
+wire-level details. Fixing it once in BusproCore fixes it for every device
+library that depends on it.
 
 ## Architecture
 
 ```
                  ┌─────────────────────────────────────────┐
-   RS485 bus --> │ BusproTransport (byte stream, DE/RE pin) │
-  (shared with   │   - finds frame boundaries via Frame     │
-   other         │   - filters: is this frame for ME?       │
-   subdevices)   └───────────────────┬───────────────────────┘
+   RS485 bus --> │ BusproTransport (byte stream, DE/RE pin) │   } from
+  (shared with   │   - finds frame boundaries via Frame     │   } BusproCore
+   other         │   - filters: is this frame for ME?       │   } (shared with
+   subdevices)   └───────────────────┬───────────────────────┘   } 4Z, etc.)
                                       │ BusproFrame (decoded struct)
                                       v
                  ┌─────────────────────────────────────────┐
-                 │ BusproDevice (op-code dispatch table)     │
-                 │   - 0x0002 Scene Control                  │
-                 │   - 0x0031/0x0032 Single Channel Control  │
-                 │   - 0x0033/0x0034 Read Status             │
+                 │ BusproDevice (op-code dispatch table)     │   }
+                 │   - 0x0002 Scene Control                  │   } also from
+                 │   - 0x0031/0x0032 Single Channel Control  │   } BusproCore
+                 │   - 0x0033/0x0034 Read Status             │   }
                  │   - (extensible: register more handlers)  │
                  └───────────────────┬───────────────────────┘
                                       │ calls into
                                       v
                  ┌─────────────────────────────────────────┐
-                 │ Relay4R (the actual device)               │
-                 │   - 4 relay channels (GPIO control)       │
-                 │   - scene table (Area+Scene -> 4 states)  │
-                 │   - RAM-only for now; ISceneStore          │
+                 │ Relay4R (the actual device)               │   } this
+                 │   - 4 relay channels (GPIO control)       │   } library
+                 │   - scene table (Area+Scene -> 4 states)  │   } (depends on
+                 │   - RAM-only for now; ISceneStore          │   } BusproCore)
                  │     interface ready for EEPROM/Flash later │
                  └─────────────────────────────────────────┘
 ```
@@ -124,12 +132,15 @@ void loop() {
 
 The library logic (dispatch, addressing, scene lookup, encode/decode
 roundtrip) can be tested on a desktop machine without any STM32 hardware,
-using a minimal Arduino API stub in `test_stubs/`:
+using a minimal Arduino API stub in `test_stubs/`. This requires BusproCore
+checked out alongside this library (adjust the path below to wherever you
+placed it):
 
 ```sh
-g++ -std=c++17 -Wall -Wextra -I test_stubs -I src \
-  src/BusproFrame.cpp src/BusproTransport.cpp src/Relay4R.cpp \
-  test_stubs/test_main.cpp -o test_4r
+g++ -std=c++17 -Wall -Wextra \
+  -I test_stubs -I src -I ../BusproCore/src \
+  ../BusproCore/src/BusproFrame.cpp ../BusproCore/src/BusproTransport.cpp \
+  src/Relay4R.cpp test_stubs/test_main.cpp -o test_4r
 ./test_4r
 ```
 

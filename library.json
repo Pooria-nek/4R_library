@@ -5,5 +5,8 @@
   "keywords": ["relay", "rs485", "hdl", "buspro", "stm32", "home-automation"],
   "frameworks": "arduino",
   "platforms": ["ststm32", "atmelavr", "*"],
-  "headers": "Relay4R.h"
+  "headers": "Relay4R.h",
+  "dependencies": {
+    "BusproCore": "^0.1.0"
+  }
 }
