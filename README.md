@@ -1,7 +1,7 @@
-# 4R — 4-Channel Relay Subdevice Library (HDL Buspro-style)
+# RelayModule — RelayModule Relay Subdevice Library (HDL Buspro-style)
 
 Arduino-framework library (works with STM32duino / "STM32 Cores" board package)
-for a 4-channel relay board that acts as a **subdevice** on a shared RS485 bus,
+for a up to 32 relay board that acts as a **subdevice** on a shared RS485 bus,
 using HDL Buspro-style addressing (Subnet ID / Device ID) and operation codes.
 
 ## Depends on BusproCore
@@ -44,7 +44,7 @@ source file. Specifically unverified (full detail in `BusproCore/README.md`):
 
 See `docs/CAPTURE_TEMPLATE.md` in this repo for the full capture procedure.
 Once confirmed, update **only** `BusproCore/src/BusproFrame.cpp` — no other
-file in BusproCore, 4R, or 4Z should need to change, since everything above
+file in BusproCore, RelayModule, or InputModule should need to change, since everything above
 that layer only depends on the decoded `BusproFrame` struct, not on
 wire-level details. Fixing it once in BusproCore fixes it for every device
 library that depends on it.
@@ -68,13 +68,13 @@ library that depends on it.
                  └───────────────────┬───────────────────────┘
                                       │ calls into
                                       v
-                 ┌─────────────────────────────────────────┐
-                 │ Relay4R (the actual device)               │   } this
-                 │   - 4 relay channels (GPIO control)       │   } library
+                 ┌───────────────────────────────────────────┐
+                 │ RelayModule (the actual device)           │   } this
+                 │   - up to 32 relay channels (GPIO control)│   } library
                  │   - scene table (Area+Scene -> 4 states)  │   } (depends on
-                 │   - RAM-only for now; ISceneStore          │   } BusproCore)
-                 │     interface ready for EEPROM/Flash later │
-                 └─────────────────────────────────────────┘
+                 │   - RAM-only for now; ISceneStore         │   } BusproCore)
+                 │     interface ready for EEPROM/Flash later│
+                 └───────────────────────────────────────────┘
 ```
 
 ## Supported operations (so far)
