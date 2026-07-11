@@ -20,7 +20,7 @@
  * bus shared with genuine HDL devices.
  */
 
-#include <Relay4R.h>
+#include <RelayModule.h>
 
 // This device's own bus address.
 constexpr uint8_t MY_SUBNET_ID = 1;

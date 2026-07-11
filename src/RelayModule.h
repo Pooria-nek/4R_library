@@ -1,6 +1,6 @@
 #pragma once
 /*
- * Relay4R.h
+ * RelayModule.h
  *
  * The "4R" device itself: 4 relay channels + scene engine, exposed as a
  * subdevice on a shared HDL-Buspro-style RS485 bus.
@@ -15,18 +15,18 @@
 #include "SceneStore.h"
 #include "MemoryCore.h"
 
-class Relay4R
+class RelayModule
 {
 public:
     // mySubnetId/myDeviceId: this device's own bus address (1-254 each).
     // dePin: RS485 transceiver DE/RE control pin (-1 if not used).
-    // relayPins: array of exactly RELAY4R_CHANNEL_COUNT GPIO pins.
+    // relayPins: array of exactly RELAY_CHANNEL_COUNT GPIO pins.
     // activeHigh: true if driving the pin HIGH energizes the relay.
-    Relay4R(
+    RelayModule(
         BusproTransport &bus,
         MemoryCore &flash,
         uint32_t sectorAddress,
-        const uint8_t relayPins[RELAY4R_CHANNEL_COUNT],
+        const uint8_t relayPins[RELAY_CHANNEL_COUNT],
         bool activeHigh = true);
 
     bool begin();
@@ -45,11 +45,11 @@ public:
     // --- Direct relay control (also usable outside of bus commands) ---
     bool setRelay(uint8_t channel /*0-3*/, bool on);
     bool getRelay(uint8_t channel) const;
-    void setAllRelays(const bool states[RELAY4R_CHANNEL_COUNT]);
+    void setAllRelays(const bool states[RELAY_CHANNEL_COUNT]);
 
     // // --- Scene table management (normally driven by a config tool, but
     // //     exposed directly too in case you want to seed scenes in code) ---
-    // bool defineScene(uint8_t area, uint8_t scene, const bool states[RELAY4R_CHANNEL_COUNT]);
+    // bool defineScene(uint8_t area, uint8_t scene, const bool states[RELAY_CHANNEL_COUNT]);
     // bool removeScene(uint8_t area, uint8_t scene);
 
     void sendResponse(uint16_t opcode, uint16_t dst, const uint8_t *payload, uint8_t payloadLen);
@@ -70,13 +70,13 @@ private:
     uint16_t devType_ = BusproDev::DEVICE_4R; // 4R device type per HDL spec
 
     uint8_t currentScene = 0;
-    uint8_t relayPins_[RELAY4R_CHANNEL_COUNT];
-    bool relayState_[RELAY4R_CHANNEL_COUNT] = {false, false, false, false};
+    uint8_t relayPins_[RELAY_CHANNEL_COUNT];
+    bool relayState_[RELAY_CHANNEL_COUNT] = {false, false, false, false};
     bool activeHigh_;
 
-    bool relayEnable_[RELAY4R_CHANNEL_COUNT] = {false, false, false, false};
-    uint8_t relayDelay_[RELAY4R_CHANNEL_COUNT] = {0, 0, 0, 0};
-    uint8_t relayProtect_[RELAY4R_CHANNEL_COUNT] = {0, 0, 0, 0};
+    bool relayEnable_[RELAY_CHANNEL_COUNT] = {false, false, false, false};
+    uint8_t relayDelay_[RELAY_CHANNEL_COUNT] = {0, 0, 0, 0};
+    uint8_t relayProtect_[RELAY_CHANNEL_COUNT] = {0, 0, 0, 0};
 
     void handleReadZone(const BusproFrame &frame);
     void handleModifyZone(const BusproFrame &frame);
